@@ -1,4 +1,4 @@
-function [] = XR_decon_data_wrapper(dataPaths, varargin)
+function [] = sld_decon_data_wrapper(sld_dataPaths, varargin)
 % data-level deconvolution wrapper, support cuda decon, cpp decon and
 % matlab decon. Adapted from the microscope pipeline. 
 % Support of option to rotate PSF, also user-defined resolution.
@@ -15,12 +15,13 @@ function [] = XR_decon_data_wrapper(dataPaths, varargin)
 % xruan (07/13/2021): add support for the processing of flipped files
 % (currently only add support for matlab decon)
 % xruan (10/19/2021): add support for dataset specific iteration
+% lcooper (6/6/2024): add support for .sld
 
 
 ip = inputParser;
 ip.CaseSensitive = false;
 ip.KeepUnmatched = true;
-ip.addRequired('dataPaths', @(x) ischar(x) || iscell(x)); % data structure from loadConditionData
+ip.addRequired('sld_dataPaths', @(x) ischar(x) || iscell(x)); % data structure from loadConditionData
 ip.addParameter('resultDirName', 'matlab_decon',  @(x) ischar(x));
 ip.addParameter('overwrite', false,  @(x) islogical(x));
 ip.addParameter('channelPatterns', {'CamA_ch0', 'CamA_ch1', 'CamB_ch0'}, @iscell);
@@ -70,8 +71,10 @@ ip.addParameter('maxTrialNum', 3, @isnumeric);
 ip.addParameter('mccMode', false, @islogical);
 ip.addParameter('configFile', '', @ischar);
 ip.addParameter('GPUConfigFile', '', @ischar);
+ip.addParameter('series', 0, @isnumeric); % series number for .sld format
 
-ip.parse(dataPaths, varargin{:});
+
+ip.parse(sld_dataPaths, varargin{:});
 
 % make sure the function is in the root LLSM5DTools. 
 mpath = fileparts(which(mfilename));
@@ -83,6 +86,8 @@ if ~exist([repo_rt, 'setup.m'], 'file')
 end
 
 pr = ip.Results;
+%load(paramFile)
+dataPaths = sld_dataPaths;
 overwrite = pr.overwrite;
 resultDirName = pr.resultDirName;
 % Resolution = pr.Resolution;
@@ -134,6 +139,7 @@ maxTrialNum = pr.maxTrialNum;
 mccMode = pr.mccMode;
 configFile = pr.configFile;
 GPUConfigFile = pr.GPUConfigFile;
+series = pr.series;
 
 if isempty(uuid)
     uuid = get_uuid();
@@ -261,7 +267,7 @@ Streaming = false;
 Decon = true;
 minModifyTime = 1;
 [fnames, fdinds, gfnames, partialvols, dataSizes, flipZstack_mat, latest_modify_times, FTP_inds, maskFullpaths] = ...
-    XR_parseImageFilenames(dataPaths, channelPatterns, parseSettingFile, flipZstack, Decon, deconPaths, Streaming, minModifyTime, zarrFile);
+    sld_parseImageFilenames(dataPaths, channelPatterns, parseSettingFile, flipZstack, Decon, deconPaths, Streaming, minModifyTime);
 
 nF = numel(fnames);
 
@@ -382,7 +388,7 @@ while ~all(is_done_flag | trial_counter >= maxTrialNum, 'all')
                 '''parseCluster'',%s,''parseParfor'',%s,''GPUJob'',%s,''save16bit'',%s,', ...
                 '''largeFile'',%s,''largeMethod'',''%s'',''batchSize'',%s,''blockSize'',%s,', ...
                 '''dampFactor'',%d,''scaleFactor'',[%d],''deconOffset'',%d,''deconMaskFns'',%s,', ...
-                '''uuid'',''%s'',''cpusPerTask'',%d,''mccMode'',%s,''configFile'',''%s'',''GPUConfigFile'',''%s'')'], ...
+                '''uuid'',''%s'',''cpusPerTask'',%d,''mccMode'',%s,''configFile'',''%s'',''GPUConfigFile'',''%s'', ''series'',%d)'], ...
                 dcframeFullpath, xyPixelSize, dc_dz, deconPath, psfFullpath, ...
                 dc_dzPSF, background, skewAngle, string(flipZstack), edgeErosion, ...
                 maskFullpath, string(SaveMaskfile), string(deconRotate), deconIter_f, ...
@@ -391,7 +397,7 @@ while ~all(is_done_flag | trial_counter >= maxTrialNum, 'all')
                 string(parseParfor), string(GPUJob), string(save16bit), string(largeFile), ...
                 largeMethod, strrep(mat2str(batchSize), ' ', ','), strrep(mat2str(blockSize), ' ', ','), ...
                 dampFactor, scaleFactor_f, deconOffset, deconMaskFns_str, uuid, ...
-                cpusPerTask, string(mccMode), configFile, GPUConfigFile);
+                cpusPerTask, string(mccMode), configFile, GPUConfigFile, series);
             
             if exist(dctmpFullpath, 'file') || parseCluster
                 if parseCluster

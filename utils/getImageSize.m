@@ -10,7 +10,7 @@ function [imSize] = getImageSize(filePath)
 % xruan (01/20/2021): add option to use bioformat to get image size
 % xruan (01/29/2021): check if jvm available, if not use binary search
 % xruan (01/14/2022): use mex version by default
-
+% lcooper (05/22/2024): add support for .sld format
 
 warning ('off','all');
 
@@ -75,15 +75,31 @@ if strcmp(filePath(end - 2 : end), 'tif') || strcmp(filePath(end - 3 : end), 'ti
         imSize = [Height, Width, Zstack];
     end
 elseif strcmp(filePath(end - 3 : end), 'zarr') || exist([filePath, '/.zarray'], 'file')
-    zarrayFn = [filePath, '/.zarray'];
-    fid = fopen(zarrayFn);
-    raw = fread(fid);
-    fclose(fid);
-    str = char(raw');
-    jdata = jsondecode(str);
-
-    imSize = jdata.shape(:)';
+    try 
+        bim = blockedImage(filePath, 'Adapter', CZarrAdapter);
+    catch ME
+        disp(ME);
+        bim = blockedImage(filePath, 'Adapter', ZarrAdapter);
+    end
+    imSize = bim.Size;
+elseif strcmp(filePath(end - 2 : end), 'sld')
+    try
+            reader = bfGetReader(filePath); 
+            Height = reader.getSizeY;
+            Width = reader.getSizeX;
+            Zstack = reader.getSizeZ;
+            if Zstack == 1
+                obj = matlab.io.internal.BigImageTiffReader(filePath);
+                Zstack = obj.NumImages;
+            end
+    catch ME
+        disp(ME)
+    end
+            reader.close()
+            imSize = [Height, Width, Zstack];
 end
+
+
 
 end
 

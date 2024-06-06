@@ -50,6 +50,7 @@ ip.addParameter('save3Dstack', [true, true, true], @(x) islogical(x) && (numel(x
 ip.addParameter('mipAxis', [0,0,1] , @(x) isnumeric(x) && numel(x) == 3);
 ip.addParameter('psfGen', true, @islogical); % psf generation
 ip.addParameter('uuid', '', @ischar);
+ip.addParameter('series', 0, @isnumeric); % series number for .sld format
 
 ip.parse(inputFn, outputFn, PSFfn, xyPixelSize, dz, dzPSF, varargin{:});
 
@@ -93,6 +94,7 @@ useGPU = pr.useGPU;
 save3Dstack = pr.save3Dstack;
 psfGen = pr.psfGen;
 uuid = pr.uuid;
+series = pr.series;
 
 SkewAngle = abs(SkewAngle);
 if ~objectiveScan
@@ -202,6 +204,7 @@ end
 % prepare for PSF
 if psfGen || ~isempty(inputFn) || strcmp(RLMethod, 'omw')
     psfgenPath = sprintf('%s/psfgen/', deconPath);
+    disp(psfgenPath)
     if ~exist(psfgenPath, 'dir')
         mkdir(psfgenPath);
     end
@@ -335,6 +338,8 @@ if isempty(rawdata)
             rawdata = readtiff(inputFn);
         case '.zarr'
             rawdata = readzarr(inputFn);
+        case '.sld'
+            rawdata = readsld(inputFn,series);
     end
 end
 
@@ -540,7 +545,7 @@ if length(mipAxis) ~= 3
 else
     if any(mipAxis)
         MIPFn = sprintf('%s/MIPs/%s_MIP_z.tif', deconPath, fsname);
-        saveMIP_frame(deconvolved, MIPFn, 'axis', mipAxis);
+        %saveMIP_frame(deconvolved, MIPFn, 'axis', mipAxis);
     end
 end
 
@@ -549,8 +554,9 @@ if save3Dstack(1)
         deconTmpPath = sprintf('%s_%s.zarr', outputFn(1 : end - 4), uuid);                
         writezarr(deconvolved, deconTmpPath, 'blockSize', blockSize);
     else
-        deconTmpPath = sprintf('%s_%s.tif', outputFn(1 : end - 4), uuid);        
+        deconTmpPath = sprintf('%s_%s.tif', outputFn(1 : end - 4), uuid);
         writetiff(deconvolved, deconTmpPath);
+        %bfsave(deconvolved, deconTmpPath)
     end
     movefile(deconTmpPath, outputFn);
 end

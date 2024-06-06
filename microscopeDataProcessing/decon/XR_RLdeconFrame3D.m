@@ -16,6 +16,7 @@ function [] = XR_RLdeconFrame3D(frameFullpaths, xyPixelSize, dz, deconPath, vara
 % xruan (07/15/2021): add support for zarr input
 % xruan (10/12/2021): setting overlap region based on the size of psf (and crop psf after psfgen)
 % xruan (11/10/2021): add support for big zarr (may be tiff later) file chunk based decon
+% lcooper (6/6/2024): add support for .sld
 
 
 ip = inputParser;
@@ -74,6 +75,7 @@ ip.addParameter('psfGen', true, @islogical); % psf generation
 ip.addParameter('mccMode', false, @islogical);
 ip.addParameter('configFile', '', @ischar);
 ip.addParameter('GPUConfigFile', '', @ischar);
+ip.addParameter('series', 0, @isnumeric); % series number for .sld format
 
 ip.parse(frameFullpaths, xyPixelSize, dz, deconPath, varargin{:});
 
@@ -102,6 +104,7 @@ wienerAlpha = pr.wienerAlpha;
 OTFCumThresh = pr.OTFCumThresh;
 skewed = pr.skewed;
 GPUJob = pr.GPUJob;
+series = pr.series;
 
 EdgeErosion = pr.EdgeErosion;
 
@@ -246,7 +249,7 @@ for f = 1 : nF
             'OTFCumThresh', OTFCumThresh, 'fixIter', fixIter, 'dampFactor', dampFactor, ...
             'scaleFactor', scaleFactor, 'deconOffset', deconOffset, 'errThresh', errThresh, ...
             'saveStep', saveStep, 'useGPU', GPUJob, 'psfGen', psfGen, 'debug', debug, ...
-            'save3Dstack', save3Dstack, 'mipAxis', mipAxis);
+            'save3Dstack', save3Dstack, 'mipAxis', mipAxis, 'series', series);
         % toc
 
         if EdgeErosion > 0
